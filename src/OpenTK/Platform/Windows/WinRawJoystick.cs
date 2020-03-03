@@ -244,6 +244,7 @@ namespace OpenTK.Platform.Windows
                 long hardware_id = handle.ToInt64();
 
                 Device device = Devices.FromHardwareId(hardware_id);
+
                 if (device != null)
                 {
                     // We have already opened this device, mark it as connected
@@ -251,36 +252,45 @@ namespace OpenTK.Platform.Windows
                 }
                 else
                 {
-                    device = new Device(handle, guid, is_xinput,
-                        is_xinput ? xinput_device_count++ : 0);
-
-                    // This is a new device, query its capabilities and add it
-                    // to the device list
-                    if (!QueryDeviceCaps(device) && !is_xinput)
+                    try
                     {
-                        continue;
-                    }
-                    device.SetConnected(true);
 
-                    // Check if a disconnected device with identical GUID already exists.
-                    // If so, replace that device with this instance.
-                    Device match = null;
-                    foreach (Device candidate in Devices)
-                    {
-                        if (candidate.GetGuid() == guid && !candidate.GetCapabilities().IsConnected)
+                        device = new Device(handle, guid, is_xinput,
+                            is_xinput ? xinput_device_count++ : 0);
+
+                        // This is a new device, query its capabilities and add it
+                        // to the device list
+                        if (!QueryDeviceCaps(device) && !is_xinput)
                         {
-                            match = candidate;
+                            continue;
                         }
-                    }
-                    if (match != null)
+                        device.SetConnected(true);
+
+                        // Check if a disconnected device with identical GUID already exists.
+                        // If so, replace that device with this instance.
+                        Device match = null;
+                        foreach (Device candidate in Devices)
+                        {
+                            if (candidate.GetGuid() == guid && !candidate.GetCapabilities().IsConnected)
+                            {
+                                match = candidate;
+                            }
+                        }
+                        if (match != null)
+                        {
+                            Devices.Remove(match.Handle.ToInt64());
+                        }
+
+                        Devices.Add(hardware_id, device);
+
+                        Debug.Print("[{0}] Connected joystick {1} ({2})",
+                            GetType().Name, device.GetGuid(), device.GetCapabilities());
+
+                    } catch (Exception e)
                     {
-                        Devices.Remove(match.Handle.ToInt64());
+                        Debug.Print("Exception thrown while trying to connect a joystick device: {0}", e);
+                        device.SetConnected(false);
                     }
-
-                    Devices.Add(hardware_id, device);
-
-                    Debug.Print("[{0}] Connected joystick {1} ({2})",
-                        GetType().Name, device.GetGuid(), device.GetCapabilities());
                 }
             }
         }
